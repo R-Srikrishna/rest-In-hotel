@@ -1,0 +1,32 @@
+{
+  "name": "hotel",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/R-Srikrishna/Hotel.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/R-Srikrishna/Hotel/issues"
+  },
+  "homepage": "https://github.com/R-Srikrishna/Hotel#readme",
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "helmet": "^8.1.0",
+    "morgan": "^1.10.1",
+    "mysql2": "^3.22.3",
+    "nodemon": "^3.1.14",
+    "pug": "^3.0.4",
+    "sequelize": "^6.37.8"
+  }
+}
