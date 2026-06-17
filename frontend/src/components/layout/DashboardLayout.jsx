@@ -1,47 +1,84 @@
-'use client'
+"use client";
 
-import { useAuth } from '@/context/AuthContext'
-import { usePathname } from 'next/navigation'
-import Header from './Header'
-import Footer from './Footer'
+import { useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+import Header from "./Header";
+import Footer from "./Footer";
+import Sidebar from "./Sidebar";
+// Define the routes that only admins should access
+const ADMIN_ONLY_ROUTES = ["/rooms", "/bookings", "/guests"];
 
 export default function ProtectedLayout({ children }) {
-  const { isAuthenticated, loading } = useAuth()
-  const pathname = usePathname()
+  // Pulling 'user' along with isAuthenticated to check roles
+  const { isAuthenticated, loading, user } = useAuth();
+  const pathname = usePathname();
+  const router = useRouter();
 
-  // Auth pages (no header/footer)
-  const isAuthPage = pathname === '/login' || pathname === '/signup'
+  const isAuthPage = pathname === "/login" || pathname === "/signup";
 
+  useEffect(() => {
+    // 1. Kick unauthenticated users to the login page
+    if (!loading && !isAuthenticated && !isAuthPage) {
+      router.push("/login");
+      return;
+    }
+
+    // 2. Security Check: If they are authenticated but not an admin, block admin routes
+    if (!loading && isAuthenticated && !isAuthPage) {
+      const isAdminRoute = ADMIN_ONLY_ROUTES.some((route) =>
+        pathname.startsWith(route),
+      );
+      if (isAdminRoute && user?.role !== "admin") {
+        router.replace("/dashboard"); // Bounce them back safely
+      }
+    }
+  }, [loading, isAuthenticated, isAuthPage, pathname, user, router]);
+
+  // Add this visual spinner check before your main return statement
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Loading...</p>
+      <div className="flex h-64 w-full items-center justify-center">
+        {/* Animated Circular Spinner */}
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600"></div>
       </div>
-    )
+    );
   }
 
-  // Show only auth form on login/signup pages
   if (isAuthPage) {
-    return <div className="min-h-screen flex flex-col">{children}</div>
+    return <div className="min-h-screen">{children}</div>;
   }
 
-  // Show header + content + footer on authenticated pages
+  // Prevent rendering admin pages content momentarily while redirecting non-admins
+  const isAdminRoute = ADMIN_ONLY_ROUTES.some((route) =>
+    pathname.startsWith(route),
+  );
+  if (isAuthenticated && isAdminRoute && user?.role !== "admin") {
+    return null;
+  }
+
   if (isAuthenticated) {
     return (
-      <div className="min-h-screen flex flex-col">
+      <div className="flex flex-col min-h-screen w-full top-0 bg-gray-50">
+        {/* Top Header */}
         <Header />
-        <main className="flex-1">{children}</main>
+
+        {/* The Core Fix: Row alignment for Sidebar + Content */}
+        <div className="flex flex-1 relative w-full">
+          {/* Sidebar sits nicely inside here */}
+          <Sidebar />
+
+          {/* Main content expands. pl-16 ensures the content sits past your fixed sidebar button */}
+          <main className="flex-grow min-w-0 p-4 md:p-6 pl-16 md:pl-6 overflow-y-auto">
+            {children}
+          </main>
+        </div>
+
+        {/* Bottom Footer stays pinned to bottom naturally via flex-col wrapper */}
         <Footer />
       </div>
-    )
+    );
   }
 
-  // Redirect to login if not authenticated
-  return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <main className="flex-1">{children}</main>
-      <Footer />
-    </div>
-  )
+  return null;
 }

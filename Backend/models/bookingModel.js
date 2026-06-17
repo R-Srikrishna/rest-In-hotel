@@ -1,7 +1,7 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/db');
 
-const Booking = sequelize.define('Booking', {
+const Booking = sequelize.define('bookings', {
     checkInDate: {
         type: DataTypes.DATE,
         allowNull: false
@@ -12,15 +12,31 @@ const Booking = sequelize.define('Booking', {
     },
     roomId: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: false,
+        references: {
+            model: 'Rooms',
+            key: 'id'
+        }
     },
     guestId: {
         type: DataTypes.INTEGER,
+        allowNull: false,
+        references: {
+            model: 'Guests',
+            key: 'id'
+        }
+    },
+    nightlyRate: {
+        type: DataTypes.FLOAT,
         allowNull: false
     },
     totalPrice: {
         type: DataTypes.FLOAT,
         allowNull: false
+    },
+    selectedFeatures: {
+        type: DataTypes.JSON,
+        allowNull: true
     },
     status: {
         type: DataTypes.ENUM(
@@ -31,6 +47,9 @@ const Booking = sequelize.define('Booking', {
         ),
         defaultValue: 'booked'
     }
+}, {
+    timestamps: true,
+    paranoid: false
 });
 
 module.exports = Booking;

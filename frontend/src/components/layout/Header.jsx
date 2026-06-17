@@ -1,40 +1,54 @@
-'use client'
+"use client";
 
-import React from 'react'
-import Link from 'next/link'
-import { useAuth } from '@/context/AuthContext'
-import { useRouter } from 'next/navigation'
+import React from "react";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
+import Sidebar from "./Sidebar";
+import { LogOut } from "lucide-react";
 
 const Header = () => {
-  const { logout } = useAuth()
-  const router = useRouter()
+  const { logout, user } = useAuth();
+  const router = useRouter();
 
   const handleLogout = () => {
-    logout()
-    router.push('/login')
-  }
+    logout();
+    router.push("/login");
+  };
+
+  const initials =
+    user?.name
+      ?.split(" ")
+      .map((n) => n[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() ?? "U";
 
   return (
-    <div>
-      <div className="flex text-center mx-auto p-2 border border-radius rounded-full w-fit">
-        <h1 className="text-gradient-blue">Rest-Inn</h1>
+    <header className="fixed top-0 left-0 right-0 z-50 h-[60px] bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between px-6">
+      {/* Left: sidebar trigger + brand */}
+      <div className="flex items-center gap-3">
+        <Sidebar />
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-blue-500" />
+          <span className="text-[15px] font-medium tracking-tight text-neutral-900 dark:text-white"></span>
+        </div>
       </div>
-      <nav className="mt-0 bg-blue-400 font-bold text-white text-2xl flex items-center justify-between px-5">
-        <div className="flex gap-5">
-          <Link href="/" className="hover:text-slate-200">Home</Link>
-          <Link href="/rooms" className="hover:text-slate-200">Rooms</Link>
-          <Link href="/bookings" className="hover:text-slate-200">Bookings</Link>
-          <Link href="/guests" className="hover:text-slate-200">Guests</Link>
+
+      {/* Right: avatar + logout */}
+      <div className="flex items-center gap-2.5">
+        <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-950 border border-neutral-200 dark:border-neutral-700 flex items-center justify-center text-[12px] font-medium text-blue-600 dark:text-blue-300">
+          {initials}
         </div>
         <button
           onClick={handleLogout}
-          className="bg-rose-600 hover:bg-rose-700 text-white font-semibold py-2 px-4 rounded transition-colors text-lg"
+          className="flex items-center gap-1.5 h-8 px-3.5 text-[13px] font-medium text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
         >
+          <LogOut size={14} />
           Logout
         </button>
-      </nav>
-    </div>
-  )
-}
+      </div>
+    </header>
+  );
+};
 
-export default Header
+export default Header;

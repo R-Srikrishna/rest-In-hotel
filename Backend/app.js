@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const cors = require('cors');
 const AppError = require('./utils/appError');
 const roomRoutes = require('./routes/roomroute');
 const guestRoutes = require('./routes/guestsroute');
@@ -8,9 +9,12 @@ const authRoutes = require('./routes/authroute');
 
 const app = express();
 
-app.set('view engine', 'pug');
-app.set('views', path.join(__dirname, 'views'));
-
+app.use(
+  cors({
+    origin: process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3001',
+    credentials: true,
+  }),
+);
 app.use(express.json());
 
 app.use('/auth', authRoutes);
@@ -28,7 +32,7 @@ app.use((err, req, res, next) => {
 
   res.status(err.statusCode).json({
     status: err.status,
-    message: err.message
+    message: err.message,
   });
 });
 

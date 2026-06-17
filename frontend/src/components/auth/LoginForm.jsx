@@ -1,58 +1,120 @@
-'use client'
+"use client";
 
-import React, { useState } from 'react'
-import LoginForm from './ProtectedRoute'
-import SignupForm from './ProtectedRoute'
+import React, { useState } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter, useSearchParams } from "next/navigation";
 
-const AuthSlider = () => {
-  const [isLogin, setIsLogin] = useState(true)
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000";
+
+const LoginForm = () => {
+  const { login } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const verified = searchParams.get("verified");
+
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
+
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleChange = (e) => {
+    setFormData((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Login failed");
+      }
+
+      login(data.token, data.data.guest);
+
+      router.push("/");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200">
-        <div className="p-1 bg-slate-200 rounded-full mx-6 mt-6 grid grid-cols-2 gap-1 relative">
-          <span
-            className={`absolute inset-y-1 w-1/2 rounded-full bg-white shadow transition-all duration-300 ${
-              isLogin ? 'left-1' : 'right-1'
-            }`}
-          />
-
-          <button
-            type="button"
-            onClick={() => setIsLogin(true)}
-            className={`relative z-10 rounded-full py-3 text-sm font-semibold transition-colors duration-300 ${
-              isLogin ? 'text-slate-900' : 'text-slate-500'
-            }`}
-          >
-            Login
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsLogin(false)}
-            className={`relative z-10 rounded-full py-3 text-sm font-semibold transition-colors duration-300 ${
-              !isLogin ? 'text-slate-900' : 'text-slate-500'
-            }`}
-          >
-            Signup
-          </button>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {verified && (
+        <div className="rounded-xl bg-green-100 border border-green-200 p-4 text-green-700">
+          ✅ Email verified successfully. Please login.
         </div>
+      )}
 
-        <div className="p-8">
-          <h1 className="text-3xl font-bold text-slate-900 mb-3">
-            {isLogin ? 'Welcome back' : 'Create your account'}
-          </h1>
-          <p className="text-sm text-slate-500 mb-8">
-            {isLogin
-              ? 'Sign in to continue to your hotel dashboard.'
-              : 'Fill in your details to create a new account.'}
-          </p>
-
-          {isLogin ? <LoginForm /> : <SignupForm />}
+      {error && (
+        <div className="rounded-xl bg-red-100 border border-red-200 p-4 text-red-700">
+          {error}
         </div>
+      )}
+
+      <div>
+        <label className="mb-2 block text-sm font-medium text-slate-700">
+          Email
+        </label>
+
+        <input
+          type="email"
+          name="email"
+          value={formData.email}
+          onChange={handleChange}
+          placeholder="Enter your email"
+          required
+          className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
+        />
       </div>
-    </div>
-  )
-}
 
-export default AuthSlider
+      <div>
+        <label className="mb-2 block text-sm font-medium text-slate-700">
+          Password
+        </label>
+
+        <input
+          type="password"
+          name="password"
+          value={formData.password}
+          onChange={handleChange}
+          placeholder="Enter your password"
+          required
+          className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
+        />
+      </div>
+
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        className="w-full rounded-xl bg-slate-900 px-4 py-3 text-white font-semibold hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {isSubmitting ? "Logging in..." : "Login"}
+      </button>
+    </form>
+  );
+};
+
+export default LoginForm;

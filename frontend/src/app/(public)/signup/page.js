@@ -1,4 +1,4 @@
-import AuthSlider from '../../../components/auth/ProtectedRoute'
+import AuthSlider from '../../../components/auth/AuthSlider'
 
 const Signup = () => {
   return <AuthSlider />

@@ -23,9 +23,7 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body>
         <AuthProvider>
-          <ProtectedLayout>
-            {children}
-          </ProtectedLayout>
+          <ProtectedLayout>{children}</ProtectedLayout>
         </AuthProvider>
       </body>
     </html>

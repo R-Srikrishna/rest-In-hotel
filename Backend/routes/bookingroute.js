@@ -1,11 +1,48 @@
 const express = require('express');
 const router = express.Router();
 
-const {getBookings, createBooking, deleteBooking, updateBooking} = require('../controllers/bookingsController')
+const authController = require('../controllers/authController');
 
-router.get('/getbookings',getBookings)
-router.post('/addbooking',createBooking)
-router.patch('/updatebooking/:id',updateBooking)
-router.delete('/deletebooking/:id',deleteBooking)
+const {
+  getBookings,
+  getBookingById,
+  createBooking,
+  updateBooking,
+  deleteBooking,
+} = require('../controllers/bookingsController');
+
+// BOOKING ENDPOINTS - Admin Only
+
+// Get all bookings (Admin only)
+router.get(
+  '/rooms',
+  authController.protect,
+  authController.restrictToAdmin,
+  getBookings,
+);
+
+// Get booking by ID (Admin only)
+router.get(
+  '/rooms/:id',
+  authController.protect,
+  authController.restrictToAdmin,
+  getBookingById,
+);
+
+// Update booking (Admin only)
+router.patch(
+  '/rooms/:id',
+  authController.protect,
+  authController.restrictToAdmin,
+  updateBooking,
+);
+
+// Delete booking (Admin only)
+router.delete(
+  '/rooms/:id',
+  authController.protect,
+  authController.restrictToAdmin,
+  deleteBooking,
+);
 
 module.exports = router;
