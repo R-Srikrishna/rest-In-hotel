@@ -5,7 +5,10 @@ const AppError = require('./utils/appError');
 const roomRoutes = require('./routes/roomroute');
 const guestRoutes = require('./routes/guestsroute');
 const bookingRoutes = require('./routes/bookingroute');
-const authRoutes = require('./routes/authroute');
+const adminRoutes = require('./routes/adminroute');
+// const authRoutes = require('./routes/authroute');
+
+require('./models');
 
 const app = express();
 
@@ -17,7 +20,7 @@ app.use(
 );
 app.use(express.json());
 
-app.use('/auth', authRoutes);
+app.use('/admin', adminRoutes);
 app.use('/rooms', roomRoutes);
 app.use('/guests', guestRoutes);
 app.use('/bookings', bookingRoutes);

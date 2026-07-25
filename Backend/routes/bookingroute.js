@@ -1,48 +1,51 @@
 const express = require('express');
+const bookingsController = require('../controllers/bookingsController');
+const guestsController = require('../controllers/guestsController');
+const adminController = require('../controllers/adminController');
+
 const router = express.Router();
 
-const authController = require('../controllers/authController');
+// =============================================================================
+// 🟢 CLIENT (GUEST) SIDE ROUTES
+// =============================================================================
 
-const {
-  getBookings,
-  getBookingById,
-  createBooking,
-  updateBooking,
-  deleteBooking,
-} = require('../controllers/bookingsController');
+// Public: Get available rooms for dates
+router.get('/available-rooms', bookingsController.getAvailableRooms);
 
-// BOOKING ENDPOINTS - Admin Only
-
-// Get all bookings (Admin only)
+// Guest actions (Requires guest auth)
+router.post(
+  '/my-booking',
+  guestsController.protectGuest,
+  bookingsController.createBooking,
+);
 router.get(
-  '/rooms',
-  authController.protect,
-  authController.restrictToAdmin,
-  getBookings,
+  '/my-bookings',
+  guestsController.protectGuest,
+  bookingsController.getMyBookings,
 );
-
-// Get booking by ID (Admin only)
 router.get(
-  '/rooms/:id',
-  authController.protect,
-  authController.restrictToAdmin,
-  getBookingById,
+  '/my-bookings/:id',
+  guestsController.protectGuest,
+  bookingsController.getMyBookingById,
 );
 
-// Update booking (Admin only)
-router.patch(
-  '/rooms/:id',
-  authController.protect,
-  authController.restrictToAdmin,
-  updateBooking,
-);
+// =============================================================================
+// 🔴 ADMIN DASHBOARD ROUTES
+// =============================================================================
+router.use(adminController.protectAdmin);
+router.use(adminController.restrictTo('admin', 'super-admin'));
 
-// Delete booking (Admin only)
-router.delete(
-  '/rooms/:id',
-  authController.protect,
-  authController.restrictToAdmin,
-  deleteBooking,
-);
+// Admin Dashboard: View total bookings or Add new booking
+router
+  .route('/')
+  .get(bookingsController.getAllBookings)
+  .post(bookingsController.createAdminBooking);
+
+// Admin Dashboard: View single booking, Update booking, or Delete booking
+router
+  .route('/:id')
+  .get(bookingsController.getBookingById)
+  .patch(bookingsController.updateBooking)
+  .delete(bookingsController.deleteBooking);
 
 module.exports = router;

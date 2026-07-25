@@ -1,70 +1,215 @@
-const Guest = require('../models/guestModel');
-const catchAsync = require('../utils/catchAsync');
-const AppError = require('../utils/appError');
-const APIFeatures = require('../utils/apiFeatures');
-const nodemailer = require('nodemailer');
+const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
-const filterObj = (obj) =>
-  Object.fromEntries(
-    Object.entries(obj).filter(([_, value]) => value !== undefined),
-  );
+const Guest = require('../models/guestModel');
+const Booking = require('../models/bookingModel');
 
-const sanitizeGuest = (guestInstance) => {
-  const g = guestInstance.toJSON
-    ? guestInstance.toJSON()
-    : { ...guestInstance };
-  if (g.password) delete g.password;
-  return g;
+const AppError = require('../utils/appError');
+const catchAsync = require('../utils/catchAsync');
+
+// Helper: Sign JWT Token for Guests
+const signToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRES_IN || '90d',
+  });
 };
 
-const sendWelcomeEmail = async (toEmail, firstName) => {
-  // Do not send plaintext passwords. This sends a simple welcome message only.
-  if (
-    !process.env.EMAIL_HOST ||
-    !process.env.EMAIL_USER ||
-    !process.env.EMAIL_PASS
-  )
-    return;
+// Helper: Send Token Response
+const createSendToken = (guest, statusCode, res) => {
+  const token = signToken(guest.id);
 
-  const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT ? Number(process.env.EMAIL_PORT) : 587,
-    secure: process.env.EMAIL_SECURE === 'true',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
+  const guestData = guest.toJSON ? guest.toJSON() : { ...guest };
+  delete guestData.password;
+  delete guestData.verificationToken;
+
+  res.status(statusCode).json({
+    status: 'success',
+    token,
+    data: {
+      guest: guestData,
     },
   });
-
-  const message = {
-    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-    to: toEmail,
-    subject: 'Welcome to Rest-Inn',
-    text: `Hi ${firstName || ''},\n\nWelcome to Rest-Inn! Your account has been created successfully.\n\nYou can log in using your email and the password you set during signup. If you forgot your password, use the password reset flow to securely set a new one.\n\nRegards,\nRest-Inn Team`,
-  };
-
-  await transporter.sendMail(message);
 };
 
-exports.getGuests = catchAsync(async (req, res, next) => {
-  const features = new APIFeatures(req.query, { where: {} })
-    .filter()
-    .sort()
-    .limitFields()
-    .paginate();
+// =============================================================================
+// 🟢 GUEST AUTHENTICATION & SELF-SERVICE
+// =============================================================================
 
-  const guests = await Guest.findAll(features.options);
+// 1. Guest Registration
+exports.guestSignup = catchAsync(async (req, res, next) => {
+  const {
+    firstName,
+    lastName,
+    email,
+    password,
+    phoneNumber,
+    gender,
+    nationality,
+  } = req.body;
 
-  const sanitized = guests.map(sanitizeGuest);
+  if (!firstName || !lastName || !email || !password || !phoneNumber) {
+    return next(new AppError('Please fill in all required fields.', 400));
+  }
+
+  const existingGuest = await Guest.findOne({ where: { email } });
+  if (existingGuest) {
+    return next(
+      new AppError('An account with this email already exists.', 400),
+    );
+  }
+
+  // Password hashing is typically handled via Sequelize pre-save hooks
+  const newGuest = await Guest.create({
+    firstName,
+    lastName,
+    email,
+    password,
+    phoneNumber,
+    gender,
+    nationality,
+  });
+
+  createSendToken(newGuest, 201, res);
+});
+
+// 2. Guest Login
+exports.guestLogin = catchAsync(async (req, res, next) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return next(new AppError('Please provide email and password.', 400));
+  }
+
+  const guest = await Guest.findOne({ where: { email } });
+  if (!guest) {
+    return next(new AppError('Incorrect email or password.', 401));
+  }
+
+  const isPasswordCorrect = await bcrypt.compare(password, guest.password);
+  if (!isPasswordCorrect) {
+    return next(new AppError('Incorrect email or password.', 401));
+  }
+
+  createSendToken(guest, 200, res);
+});
+
+// 3. Guest Protect Middleware (Authentication)
+exports.protectGuest = catchAsync(async (req, res, next) => {
+  let token;
+
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith('Bearer')
+  ) {
+    token = req.headers.authorization.split(' ')[1];
+  }
+
+  if (!token) {
+    return next(
+      new AppError('You are not logged in. Please log in to gain access.', 401),
+    );
+  }
+
+  const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  const currentGuest = await Guest.findByPk(decoded.id);
+
+  if (!currentGuest) {
+    return next(
+      new AppError('The guest belonging to this token no longer exists.', 401),
+    );
+  }
+
+  // Attach guest user context to req
+  req.user = currentGuest;
+  next();
+});
+
+// 4. Guest View Profile
+exports.getMe = catchAsync(async (req, res, next) => {
+  const guest = await Guest.findByPk(req.user.id, {
+    attributes: { exclude: ['password', 'verificationToken'] },
+  });
 
   res.status(200).json({
     status: 'success',
-    results: sanitized.length,
-    guests: sanitized,
+    data: { guest },
   });
 });
 
+// 5. Guest Update Self Profile
+exports.updateMe = catchAsync(async (req, res, next) => {
+  // Disallow password updates through this route
+  if (req.body.password) {
+    return next(
+      new AppError(
+        'This route is not for password updates. Please use /updatePassword.',
+        400,
+      ),
+    );
+  }
+
+  const allowedFields = [
+    'firstName',
+    'lastName',
+    'phoneNumber',
+    'gender',
+    'nationality',
+  ];
+  const filteredBody = {};
+
+  Object.keys(req.body).forEach((key) => {
+    if (allowedFields.includes(key)) {
+      filteredBody[key] = req.body[key];
+    }
+  });
+
+  const updatedGuest = await req.user.update(filteredBody);
+
+  const guestData = updatedGuest.toJSON();
+  delete guestData.password;
+  delete guestData.verificationToken;
+
+  res.status(200).json({
+    status: 'success',
+    data: { guest: guestData },
+  });
+});
+
+// =============================================================================
+// 🔴 ADMIN & SUPER-ADMIN GUEST MANAGEMENT
+// =============================================================================
+
+// 6. Admin: Get List of All Guests
+exports.getAllGuests = catchAsync(async (req, res, next) => {
+  const guests = await Guest.findAll({
+    attributes: { exclude: ['password', 'verificationToken'] },
+  });
+
+  res.status(200).json({
+    status: 'success',
+    results: guests.length,
+    data: { guests },
+  });
+});
+
+// 7. Admin: Get Single Guest Details (Including booking history)
+exports.getGuestById = catchAsync(async (req, res, next) => {
+  const guest = await Guest.findByPk(req.params.id, {
+    attributes: { exclude: ['password', 'verificationToken'] },
+    include: [{ model: Booking }],
+  });
+
+  if (!guest) {
+    return next(new AppError('No guest found with that ID', 404));
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: { guest },
+  });
+});
+
+// 8. Admin: Create Guest Account Manually
 exports.createGuest = catchAsync(async (req, res, next) => {
   const {
     firstName,
@@ -73,7 +218,6 @@ exports.createGuest = catchAsync(async (req, res, next) => {
     password,
     phoneNumber,
     gender,
-    country,
     nationality,
   } = req.body;
 
@@ -84,111 +228,110 @@ exports.createGuest = catchAsync(async (req, res, next) => {
     !password ||
     !phoneNumber ||
     !gender ||
-    !country ||
     !nationality
   ) {
+    return next(new AppError('Please fill required details to continue', 400));
+  }
+
+  const existingGuest = await Guest.findOne({ where: { email } });
+  if (existingGuest) {
+    return next(new AppError('A guest with this email already exists', 400));
+  }
+
+  const newGuest = await Guest.create({
+    firstName,
+    lastName,
+    email,
+    password,
+    phoneNumber,
+    gender,
+    nationality,
+  });
+
+  const guestData = newGuest.toJSON();
+  delete guestData.password;
+  delete guestData.verificationToken;
+
+  res.status(201).json({
+    status: 'success',
+    data: { guest: guestData },
+  });
+});
+
+// 9. Admin: Update Guest Details
+exports.updateGuest = catchAsync(async (req, res, next) => {
+  const { id } = req.params;
+  const guest = await Guest.findByPk(id);
+
+  if (!guest) {
+    return next(new AppError('No guest found with that ID', 404));
+  }
+
+  if (Object.keys(req.body).length === 0) {
+    return next(
+      new AppError('Please provide at least one field to update', 400),
+    );
+  }
+
+  // Handle email collision
+  if (req.body.email && req.body.email !== guest.email) {
+    const existingGuest = await Guest.findOne({
+      where: { email: req.body.email },
+    });
+    if (existingGuest) {
+      return next(
+        new AppError('Another guest is already using this email', 400),
+      );
+    }
+  }
+
+  // Prevent plain text password overwrite
+  if (req.body.password) {
+    delete req.body.password;
+  }
+
+  await guest.update(req.body);
+
+  const updatedGuest = guest.toJSON();
+  delete updatedGuest.password;
+  delete updatedGuest.verificationToken;
+
+  res.status(200).json({
+    status: 'success',
+    data: { guest: updatedGuest },
+  });
+});
+
+// 10. Admin: Delete Guest
+exports.deleteGuest = catchAsync(async (req, res, next) => {
+  const { id } = req.params;
+  const guest = await Guest.findByPk(id);
+
+  if (!guest) {
+    return next(new AppError('No guest found with that ID', 404));
+  }
+
+  // Safety check for active bookings
+  const activeBookings = await Booking.findOne({
+    where: {
+      guestId: id,
+      status: ['confirmed', 'checked-in'],
+    },
+  });
+
+  if (activeBookings) {
     return next(
       new AppError(
-        'Please provide firstName,lastName,email,password,phoneNumber,gender,country,nationality',
+        'Cannot delete guest with active or ongoing bookings. Resolve bookings first.',
         400,
       ),
     );
   }
 
-  const hashedPassword = await bcrypt.hash(password, 12);
-
-  const guest = await Guest.create({
-    firstName,
-    lastName,
-    email,
-    password: hashedPassword,
-    phoneNumber,
-    gender,
-    country,
-    nationality,
-  });
-
-  const guestData = sanitizeGuest(guest);
-
-  // send welcome email (no plaintext password)
-  try {
-    await sendWelcomeEmail(email, firstName);
-  } catch (err) {
-    // don't block creation on email failure
-    console.error('Welcome email failed:', err.message);
-  }
-
-  res.status(201).json({
-    status: 'success',
-    guest: guestData,
-  });
-});
-
-exports.updateGuest = catchAsync(async (req, res, next) => {
-  const { id } = req.params;
-
-  const {
-    firstName,
-    lastName,
-    email,
-    phoneNumber,
-    gender,
-    country,
-    nationality,
-  } = req.body;
-
-  const guest = await Guest.findByPk(id);
-
-  if (!guest) {
-    return next(new AppError('Guest not found', 404));
-  }
-
-  if (firstName !== undefined) guest.firstName = firstName;
-  if (lastName !== undefined) guest.lastName = lastName;
-  if (email !== undefined) guest.email = email;
-  if (phoneNumber !== undefined) guest.phoneNumber = phoneNumber;
-  if (gender !== undefined) guest.gender = gender;
-  if (country !== undefined) guest.country = country;
-  if (nationality !== undefined) guest.nationality = nationality;
-
-  await guest.save(); // <-- Required
-
-  const guestData = sanitizeGuest(guest);
-
-  res.status(200).json({
-    status: 'success',
-    guest: guestData,
-  });
-});
-
-exports.deleteGuest = catchAsync(async (req, res, next) => {
-  const { id } = req.params;
-
-  const guest = await Guest.findByPk(id);
-  if (!guest) {
-    return next(new AppError('Guest not found', 404));
-  }
-
   await guest.destroy();
 
-  res.status(200).json({
+  res.status(204).json({
     status: 'success',
-    message: 'Guest deleted successfully',
-  });
-});
-
-exports.getGuestById = catchAsync(async (req, res, next) => {
-  const { id } = req.params;
-
-  const guest = await Guest.findByPk(id);
-  if (!guest) {
-    return next(new AppError('Guest not found', 404));
-  }
-
-  const guestData = sanitizeGuest(guest);
-
-  res.status(200).json({
-    status: 'success',
-    guest: guestData,
+    data: null,
   });
 });
