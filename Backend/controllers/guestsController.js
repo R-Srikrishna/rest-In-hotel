@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
 const Guest = require('../models/guestModel');
+const Admin = require('../models/adminModel');
 const Booking = require('../models/bookingModel');
 
 const AppError = require('../utils/appError');
@@ -27,6 +28,22 @@ const createSendToken = (guest, statusCode, res) => {
     token,
     data: {
       guest: guestData,
+    },
+  });
+};
+
+// Helper: Send Admin Token Response
+const createSendAdminToken = (admin, statusCode, res) => {
+  const token = signToken(admin.id);
+
+  const adminData = admin.toJSON ? admin.toJSON() : { ...admin };
+  delete adminData.password;
+
+  res.status(statusCode).json({
+    status: 'success',
+    token,
+    data: {
+      admin: adminData,
     },
   });
 };
@@ -72,7 +89,7 @@ exports.guestSignup = catchAsync(async (req, res, next) => {
   createSendToken(newGuest, 201, res);
 });
 
-// 2. Guest Login
+// 2. Guest/Login for admin or guest
 exports.guestLogin = catchAsync(async (req, res, next) => {
   const { email, password } = req.body;
 
@@ -80,6 +97,21 @@ exports.guestLogin = catchAsync(async (req, res, next) => {
     return next(new AppError('Please provide email and password.', 400));
   }
 
+  // First try admin login if the email belongs to an admin
+  const admin = await Admin.findOne({ where: { email } });
+  if (admin) {
+    const isAdminPasswordCorrect = await bcrypt.compare(
+      password,
+      admin.password,
+    );
+    if (!isAdminPasswordCorrect) {
+      return next(new AppError('Incorrect email or password.', 401));
+    }
+
+    return createSendAdminToken(admin, 200, res);
+  }
+
+  // Fall back to guest login
   const guest = await Guest.findOne({ where: { email } });
   if (!guest) {
     return next(new AppError('Incorrect email or password.', 401));

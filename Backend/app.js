@@ -11,10 +11,22 @@ const adminRoutes = require('./routes/adminroute');
 require('./models');
 
 const app = express();
+const allowedOrigins = [
+  process.env.NEXT_PUBLIC_FRONTEND_URL,
+  'http://localhost:3000',
+  'http://localhost:3001',
+].filter(Boolean);
 
 app.use(
   cors({
-    origin: process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3001',
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(null, false);
+    },
     credentials: true,
   }),
 );

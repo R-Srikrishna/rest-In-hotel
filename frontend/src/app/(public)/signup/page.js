@@ -1,7 +1,5 @@
-import AuthSlider from '../../../components/auth/AuthSlider'
+import AuthForm from "@/components/auth/AuthForm";
 
-const Signup = () => {
-  return <AuthSlider />
+export default function GuestSignupPage() {
+  return <AuthForm mode="signup" userType="guest" showSlider />;
 }
-
-export default Signup

@@ -7,7 +7,7 @@ import Header from "./Header";
 import Footer from "./Footer";
 import Sidebar from "./Sidebar";
 // Define the routes that only admins should access
-const ADMIN_ONLY_ROUTES = ["/rooms", "/bookings", "/guests"];
+const ADMIN_ONLY_ROUTES = ["/admin", "/admin/rooms", "/admin/bookings", "/admin/guests"];
 
 export default function ProtectedLayout({ children }) {
   // Pulling 'user' along with isAuthenticated to check roles
@@ -15,7 +15,10 @@ export default function ProtectedLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  const isAuthPage = pathname === "/login" || pathname === "/signup";
+  const isAuthPage =
+    pathname === "/login" ||
+    pathname === "/signup" ||
+    pathname === "/admin/login";
 
   useEffect(() => {
     // 1. Kick unauthenticated users to the login page
@@ -26,11 +29,9 @@ export default function ProtectedLayout({ children }) {
 
     // 2. Security Check: If they are authenticated but not an admin, block admin routes
     if (!loading && isAuthenticated && !isAuthPage) {
-      const isAdminRoute = ADMIN_ONLY_ROUTES.some((route) =>
-        pathname.startsWith(route),
-      );
+      const isAdminRoute = ADMIN_ONLY_ROUTES.some((route) => pathname.startsWith(route));
       if (isAdminRoute && user?.role !== "admin") {
-        router.replace("/dashboard"); // Bounce them back safely
+        router.replace("/book-room");
       }
     }
   }, [loading, isAuthenticated, isAuthPage, pathname, user, router]);
@@ -69,7 +70,7 @@ export default function ProtectedLayout({ children }) {
           <Sidebar />
 
           {/* Main content expands. pl-16 ensures the content sits past your fixed sidebar button */}
-          <main className="flex-grow min-w-0 p-4 md:p-6 pl-16 md:pl-6 overflow-y-auto">
+          <main className="flex-grow min-w-0 p-4 pt-20 md:p-6 md:pl-6 overflow-y-auto">
             {children}
           </main>
         </div>

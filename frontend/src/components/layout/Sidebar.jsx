@@ -9,7 +9,6 @@ import {
   DoorOpen,
   Users,
   Calendar,
-  BarChart3,
   Settings,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -35,30 +34,40 @@ const Sidebar = () => {
       ? [
           {
             name: "Dashboard",
-            href: "/dashboard",
+            href: "/admin",
             icon: LayoutDashboard,
           },
           {
             name: "Rooms",
-            href: "/rooms",
+            href: "/admin/rooms",
             icon: DoorOpen,
           },
           {
             name: "Guests",
-            href: "/guests",
+            href: "/admin/guests",
             icon: Users,
           },
           {
             name: "Bookings",
-            href: "/bookings",
+            href: "/admin/bookings",
             icon: Calendar,
           },
         ]
       : [
           {
             name: "Dashboard",
-            href: "/dashboard",
+            href: "/",
             icon: LayoutDashboard,
+          },
+          {
+            name: "Book room",
+            href: "/book-room",
+            icon: DoorOpen,
+          },
+          {
+            name: "My bookings",
+            href: "/my-bookings",
+            icon: Calendar,
           },
         ];
 
@@ -106,7 +115,7 @@ const Sidebar = () => {
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href;
+            const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
             return (
               <Link

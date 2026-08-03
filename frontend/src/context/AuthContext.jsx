@@ -1,32 +1,31 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState } from "react";
 
 const AuthContext = createContext(null);
 
+const getStoredAuth = () => {
+  if (typeof window === "undefined") {
+    return { user: null, token: null, isAuthenticated: false };
+  }
+
+  const storedToken = localStorage.getItem("token");
+  const storedUser = localStorage.getItem("user");
+
+  return {
+    user: storedUser ? JSON.parse(storedUser) : null,
+    token: storedToken || null,
+    isAuthenticated: Boolean(storedToken),
+  };
+};
+
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const initialAuth = getStoredAuth();
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const storedToken = localStorage.getItem("token");
-      const storedUser = localStorage.getItem("user");
-
-      if (storedToken) {
-        setToken(storedToken);
-        setIsAuthenticated(true);
-      }
-
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
-      }
-
-      setLoading(false);
-    }
-  }, []);
+  const [user, setUser] = useState(initialAuth.user);
+  const [token, setToken] = useState(initialAuth.token);
+  const [isAuthenticated, setIsAuthenticated] = useState(initialAuth.isAuthenticated);
+  const [loading, setLoading] = useState(false);
 
   const login = (authToken, userData = null) => {
     localStorage.setItem("token", authToken);

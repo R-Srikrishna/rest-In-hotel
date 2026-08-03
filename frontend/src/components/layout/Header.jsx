@@ -3,7 +3,6 @@
 import React from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import Sidebar from "./Sidebar";
 import { LogOut } from "lucide-react";
 
 const Header = () => {
@@ -25,12 +24,13 @@ const Header = () => {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-[60px] bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between px-6">
-      {/* Left: sidebar trigger + brand */}
+      {/* Left: brand */}
       <div className="flex items-center gap-3">
-        <Sidebar />
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-blue-500" />
-          <span className="text-[15px] font-medium tracking-tight text-neutral-900 dark:text-white"></span>
+          <span className="text-[15px] font-medium tracking-tight text-neutral-900 dark:text-white">
+            Hotel Manager
+          </span>
         </div>
       </div>
 
