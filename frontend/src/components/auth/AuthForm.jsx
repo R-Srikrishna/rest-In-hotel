@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { loginGuest, signupGuest } from "@/services/auth.service";
+import { loginGuest, loginAdmin, signupGuest } from "@/services/auth.service";
 
 const guestInitialState = {
   firstName: "",
@@ -38,19 +38,21 @@ export default function AuthForm({
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const showModeSwitch = showSlider;
+  const showModeSwitch = showSlider && userType !== "admin";
   const currentMode = showModeSwitch ? activeMode : mode;
   const isLoginMode = currentMode === "login";
   const isSignupMode = currentMode === "signup";
-
-  useEffect(() => {
-    setFormData(getInitialFormData(currentMode));
-    setError("");
-  }, [currentMode]);
+  const isAdminPortal = userType === "admin";
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const switchMode = (nextMode) => {
+    setActiveMode(nextMode);
+    setFormData(getInitialFormData(nextMode));
+    setError("");
   };
 
   const handleSubmit = async (e) => {
@@ -63,6 +65,11 @@ export default function AuthForm({
 
       if (isSignupMode) {
         response = await signupGuest(formData);
+      } else if (userType === "admin") {
+        response = await loginAdmin({
+          email: formData.email,
+          password: formData.password,
+        });
       } else {
         response = await loginGuest({
           email: formData.email,
@@ -98,10 +105,18 @@ export default function AuthForm({
         <div className="px-6 py-8 sm:px-10 lg:px-12">
           <div className="mb-6 text-center">
             <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-100">
-              {isSignupMode ? "Guest access" : "Sign in"}
+              {isSignupMode
+                ? "Guest access"
+                : isAdminPortal
+                  ? "Admin Portal"
+                  : "Guest access"}
             </p>
             <h1 className="mt-4 text-4xl font-semibold leading-tight sm:text-5xl">
-              {isSignupMode ? "Create your account" : "Welcome back"}
+              {isSignupMode
+                ? "Create your account"
+                : isAdminPortal
+                  ? "Sign in to admin"
+                  : "Welcome back"}
             </h1>
             {/* <p className="mt-4 text-base text-blue-50/90">
               {isSignupMode
@@ -113,7 +128,11 @@ export default function AuthForm({
           <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-2xl font-semibold text-white">
-                {isSignupMode ? "Sign up" : "Sign in"}
+                {isSignupMode
+                  ? "Sign up"
+                  : isAdminPortal
+                    ? "Admin sign in"
+                    : "Sign in"}
               </h2>
               {/* <p className="mt-1 text-sm text-slate-400">
                 {isSignupMode
@@ -126,7 +145,7 @@ export default function AuthForm({
               <div className="inline-flex rounded-full bg-slate-800 p-1">
                 <button
                   type="button"
-                  onClick={() => setActiveMode("login")}
+                  onClick={() => switchMode("login")}
                   className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                     currentMode === "login"
                       ? "bg-white text-slate-900"
@@ -137,7 +156,7 @@ export default function AuthForm({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveMode("signup")}
+                  onClick={() => switchMode("signup")}
                   className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                     currentMode === "signup"
                       ? "bg-white text-slate-900"

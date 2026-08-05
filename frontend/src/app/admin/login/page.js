@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import AuthForm from "@/components/auth/AuthForm";
 
 export default function AdminLoginPage() {
-  redirect("/login?role=admin");
+  return <AuthForm mode="login" userType="admin" showSlider={false} />;
 }

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchRooms } from "@/services/room.service";
-import { fetchBookings } from "@/services/booking.service";
+import { fetchAdminRooms } from "@/services/room.service";
+import { fetchAdminBookings } from "@/services/booking.service";
 import api from "@/lib/axios";
 
 const cards = [
@@ -18,8 +18,8 @@ export default function AdminDashboardPage() {
     const load = async () => {
       try {
         const [rooms, bookings, guestsResponse] = await Promise.all([
-          fetchRooms(),
-          fetchBookings(),
+          fetchAdminRooms(),
+          fetchAdminBookings(),
           api.get("/guests"),
         ]);
 

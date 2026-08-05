@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 
 const AuthContext = createContext(null);
 
@@ -20,12 +20,19 @@ const getStoredAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const initialAuth = getStoredAuth();
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const [user, setUser] = useState(initialAuth.user);
-  const [token, setToken] = useState(initialAuth.token);
-  const [isAuthenticated, setIsAuthenticated] = useState(initialAuth.isAuthenticated);
-  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    const storedAuth = getStoredAuth();
+
+    setUser(storedAuth.user);
+    setToken(storedAuth.token);
+    setIsAuthenticated(storedAuth.isAuthenticated);
+    setLoading(false);
+  }, []);
 
   const login = (authToken, userData = null) => {
     localStorage.setItem("token", authToken);

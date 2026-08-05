@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchBookings } from "@/services/booking.service";
+import { fetchGuestBookings } from "@/services/booking.service";
 
 export default function GuestBookingsPage() {
   const [bookings, setBookings] = useState([]);
@@ -10,7 +10,7 @@ export default function GuestBookingsPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await fetchBookings();
+        const data = await fetchGuestBookings();
         setBookings(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error(error);

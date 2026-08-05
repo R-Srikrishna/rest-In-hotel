@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { deleteBooking, fetchBookings, updateBooking } from "@/services/booking.service";
+import { deleteBooking, fetchAdminBookings, updateBooking } from "@/services/booking.service";
 
 export default function BookingTable() {
   const [bookings, setBookings] = useState([]);
@@ -9,7 +9,7 @@ export default function BookingTable() {
 
   const loadBookings = async () => {
     try {
-      const data = await fetchBookings();
+      const data = await fetchAdminBookings();
       setBookings(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);
@@ -23,7 +23,7 @@ export default function BookingTable() {
 
     const runLoad = async () => {
       try {
-        const data = await fetchBookings();
+        const data = await fetchAdminBookings();
         if (active) {
           setBookings(Array.isArray(data) ? data : []);
         }

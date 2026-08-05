@@ -5,14 +5,20 @@ const API_URL = "/rooms";
 
 export const fetchRooms = async () => {
   try {
-    const response = await api.get("/rooms");
-
-    // console.log("FULL RESPONSE:", response);
-    // console.log("RESPONSE DATA:", response.data);
-
-    return response.data.rooms;
+    const response = await api.get(`${API_URL}/available`);
+    return response.data?.data?.rooms ?? response.data?.rooms ?? [];
   } catch (err) {
     console.error("Fetch Rooms Error:", err);
+    throw err;
+  }
+};
+
+export const fetchAdminRooms = async () => {
+  try {
+    const response = await api.get(API_URL);
+    return response.data?.data?.rooms ?? response.data?.rooms ?? [];
+  } catch (err) {
+    console.error("Fetch Admin Rooms Error:", err);
     throw err;
   }
 };

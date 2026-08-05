@@ -1,5 +1,13 @@
 import AuthForm from "@/components/auth/AuthForm";
 
-export default function GuestLoginPage() {
-  return <AuthForm mode="login" userType="guest" showSlider />;
+export default function GuestLoginPage({ searchParams }) {
+  const isAdmin = searchParams?.role === "admin";
+
+  return (
+    <AuthForm
+      mode="login"
+      userType={isAdmin ? "admin" : "guest"}
+      showSlider={!isAdmin}
+    />
+  );
 }
