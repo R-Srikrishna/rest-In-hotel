@@ -101,7 +101,7 @@ npm run dev
 Open your browser and visit:
 
 - Frontend: http://localhost:3000
-- Backend API: http://localhost:3000 or your configured port
+- Backend API: http://localhost:5000 or your configured port
 
 ## Learning Goals
 
