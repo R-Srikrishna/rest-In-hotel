@@ -7,17 +7,16 @@ const sequelize = new Sequelize(
   process.env.DB_PASSWORD,
   {
     host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
     dialect: 'mysql',
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false,
+      },
+    },
+    logging: false,
   },
 );
-
-sequelize
-  .authenticate()
-  .then(() => {
-    console.log('Mysql connected with Sequelize');
-  })
-  .catch((err) => {
-    console.log(err);
-  });
 
 module.exports = sequelize;
