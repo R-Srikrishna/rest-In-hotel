@@ -3,7 +3,7 @@ const sequelize = require('../config/db');
 const bcrypt = require('bcrypt'); // Make sure to npm install bcrypt
 
 const Guest = sequelize.define(
-  'Guest',
+  'guest',
   {
     id: {
       type: DataTypes.INTEGER,

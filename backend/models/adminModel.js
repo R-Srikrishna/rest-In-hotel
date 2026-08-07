@@ -3,7 +3,7 @@ const sequelize = require('../config/db.js');
 const bcrypt = require('bcryptjs');
 
 const Admin = sequelize.define(
-  'Admin',
+  'admin',
   {
     id: {
       type: DataTypes.INTEGER,
