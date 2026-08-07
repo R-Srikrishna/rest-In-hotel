@@ -19,16 +19,25 @@ const allowedOrigins = [
 
 app.use(
   cors({
-    origin: (origin, callback) => {
+    origin(origin, callback) {
       console.log('Origin:', origin);
-      console.log('Allowed Origins:', allowedOrigins);
 
       // Allow requests without Origin (Postman, mobile apps)
       if (!origin) {
         return callback(null, true);
       }
 
+      // Allow configured origins
       if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // Allow all Vercel preview deployments for this project
+      if (
+        /^https:\/\/rest-in-hotel-[a-z0-9-]+-sri-rayudus-projects\.vercel\.app$/.test(
+          origin,
+        )
+      ) {
         return callback(null, true);
       }
 
@@ -46,6 +55,9 @@ app.use(
   }),
 );
 
+// Handle preflight requests
+app.options('*', cors());
+
 app.use(express.json());
 
 app.use('/admin', adminRoutes);
@@ -53,10 +65,12 @@ app.use('/rooms', roomRoutes);
 app.use('/guests', guestRoutes);
 app.use('/bookings', bookingRoutes);
 
+// 404 Handler
 app.use((req, res, next) => {
   next(new AppError(`Cannot find ${req.originalUrl} on this server`, 404));
 });
 
+// Global Error Handler
 app.use((err, req, res, next) => {
   console.error('Global Error:', err);
 
