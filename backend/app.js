@@ -1,35 +1,52 @@
 const express = require('express');
-const path = require('path');
 const cors = require('cors');
 const AppError = require('./utils/appError');
+
 const roomRoutes = require('./routes/roomroute');
 const guestRoutes = require('./routes/guestsroute');
 const bookingRoutes = require('./routes/bookingroute');
 const adminRoutes = require('./routes/adminroute');
-// const authRoutes = require('./routes/authroute');
 
 require('./models');
 
 const app = express();
+
 const allowedOrigins = [
-  process.env.NEXT_PUBLIC_FRONTEND_URL,
+  process.env.FRONTEND_URL,
   'http://localhost:3000',
   'http://localhost:3001',
+  'https://rest-in-hotel-ten.vercel.app',
 ].filter(Boolean);
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-        return;
+      console.log('Origin:', origin);
+      console.log('Allowed Origins:', allowedOrigins);
+
+      // Allow requests without Origin (Postman, mobile apps)
+      if (!origin) {
+        return callback(null, true);
       }
 
-      callback(null, false);
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`Origin ${origin} not allowed by CORS`));
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Origin',
+      'X-Requested-With',
+      'Content-Type',
+      'Accept',
+      'Authorization',
+    ],
   }),
 );
+
 app.use(express.json());
 
 app.use('/admin', adminRoutes);
@@ -41,9 +58,8 @@ app.use((req, res, next) => {
   next(new AppError(`Cannot find ${req.originalUrl} on this server`, 404));
 });
 
-// app.js
 app.use((err, req, res, next) => {
-  console.error('Global Error Caught:', err);
+  console.error('Global Error:', err);
 
   res.status(err.statusCode || 500).json({
     status: err.status || 'error',
