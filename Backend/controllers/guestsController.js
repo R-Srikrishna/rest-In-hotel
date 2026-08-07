@@ -8,14 +8,14 @@ const Booking = require('../models/bookingModel');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 
-// Helper: Sign JWT Token for Guests
+// Generates a JWT token using the guest ID and secret
 const signToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '90d',
   });
 };
 
-// Helper: Send Token Response
+// Formats guest data, signs a token, and sends a JSON authentication response
 const createSendToken = (guest, statusCode, res) => {
   const token = signToken(guest.id);
 
@@ -32,7 +32,7 @@ const createSendToken = (guest, statusCode, res) => {
   });
 };
 
-// Helper: Send Admin Token Response
+// Formats admin data, signs a token, and sends an authentication response
 const createSendAdminToken = (admin, statusCode, res) => {
   const token = signToken(admin.id);
 
@@ -48,11 +48,7 @@ const createSendAdminToken = (admin, statusCode, res) => {
   });
 };
 
-// =============================================================================
-// 🟢 GUEST AUTHENTICATION & SELF-SERVICE
-// =============================================================================
-
-// 1. Guest Registration
+// Registers a new guest account after checking for existing email records
 exports.guestSignup = catchAsync(async (req, res, next) => {
   const {
     firstName,
@@ -75,7 +71,6 @@ exports.guestSignup = catchAsync(async (req, res, next) => {
     );
   }
 
-  // Password hashing is typically handled via Sequelize pre-save hooks
   const newGuest = await Guest.create({
     firstName,
     lastName,
@@ -89,7 +84,7 @@ exports.guestSignup = catchAsync(async (req, res, next) => {
   createSendToken(newGuest, 201, res);
 });
 
-// 2. Guest/Login for admin or guest
+// Authenticates user credentials by checking admin accounts first and guest accounts second
 exports.guestLogin = catchAsync(async (req, res, next) => {
   const { email, password } = req.body;
 
@@ -97,7 +92,6 @@ exports.guestLogin = catchAsync(async (req, res, next) => {
     return next(new AppError('Please provide email and password.', 400));
   }
 
-  // First try admin login if the email belongs to an admin
   const admin = await Admin.findOne({ where: { email } });
   if (admin) {
     const isAdminPasswordCorrect = await bcrypt.compare(
@@ -111,7 +105,6 @@ exports.guestLogin = catchAsync(async (req, res, next) => {
     return createSendAdminToken(admin, 200, res);
   }
 
-  // Fall back to guest login
   const guest = await Guest.findOne({ where: { email } });
   if (!guest) {
     return next(new AppError('Incorrect email or password.', 401));
@@ -125,7 +118,7 @@ exports.guestLogin = catchAsync(async (req, res, next) => {
   createSendToken(guest, 200, res);
 });
 
-// 3. Guest Protect Middleware (Authentication)
+// Middleware to verify guest JWT token and attach user context to request
 exports.protectGuest = catchAsync(async (req, res, next) => {
   let token;
 
@@ -151,12 +144,11 @@ exports.protectGuest = catchAsync(async (req, res, next) => {
     );
   }
 
-  // Attach guest user context to req
   req.user = currentGuest;
   next();
 });
 
-// 4. Guest View Profile
+// Retrieves the profile information for the currently authenticated guest
 exports.getMe = catchAsync(async (req, res, next) => {
   const guest = await Guest.findByPk(req.user.id, {
     attributes: { exclude: ['password', 'verificationToken'] },
@@ -168,9 +160,8 @@ exports.getMe = catchAsync(async (req, res, next) => {
   });
 });
 
-// 5. Guest Update Self Profile
+// Updates non-sensitive personal profile details for the logged-in guest
 exports.updateMe = catchAsync(async (req, res, next) => {
-  // Disallow password updates through this route
   if (req.body.password) {
     return next(
       new AppError(
@@ -207,11 +198,7 @@ exports.updateMe = catchAsync(async (req, res, next) => {
   });
 });
 
-// =============================================================================
-// 🔴 ADMIN & SUPER-ADMIN GUEST MANAGEMENT
-// =============================================================================
-
-// 6. Admin: Get List of All Guests
+// Retrieves a list of all guest accounts excluding passwords and sensitive tokens
 exports.getAllGuests = catchAsync(async (req, res, next) => {
   const guests = await Guest.findAll({
     attributes: { exclude: ['password', 'verificationToken'] },
@@ -224,7 +211,7 @@ exports.getAllGuests = catchAsync(async (req, res, next) => {
   });
 });
 
-// 7. Admin: Get Single Guest Details (Including booking history)
+// Retrieves detailed information for a single guest along with their booking history
 exports.getGuestById = catchAsync(async (req, res, next) => {
   const guest = await Guest.findByPk(req.params.id, {
     attributes: { exclude: ['password', 'verificationToken'] },
@@ -241,7 +228,7 @@ exports.getGuestById = catchAsync(async (req, res, next) => {
   });
 });
 
-// 8. Admin: Create Guest Account Manually
+// Allows administrators to manually register a new guest account
 exports.createGuest = catchAsync(async (req, res, next) => {
   const {
     firstName,
@@ -290,7 +277,7 @@ exports.createGuest = catchAsync(async (req, res, next) => {
   });
 });
 
-// 9. Admin: Update Guest Details
+// Updates profile information of a specified guest account by admin
 exports.updateGuest = catchAsync(async (req, res, next) => {
   const { id } = req.params;
   const guest = await Guest.findByPk(id);
@@ -305,7 +292,6 @@ exports.updateGuest = catchAsync(async (req, res, next) => {
     );
   }
 
-  // Handle email collision
   if (req.body.email && req.body.email !== guest.email) {
     const existingGuest = await Guest.findOne({
       where: { email: req.body.email },
@@ -317,7 +303,6 @@ exports.updateGuest = catchAsync(async (req, res, next) => {
     }
   }
 
-  // Prevent plain text password overwrite
   if (req.body.password) {
     delete req.body.password;
   }
@@ -334,7 +319,7 @@ exports.updateGuest = catchAsync(async (req, res, next) => {
   });
 });
 
-// 10. Admin: Delete Guest
+// Deletes a guest record after verifying there are no active bookings
 exports.deleteGuest = catchAsync(async (req, res, next) => {
   const { id } = req.params;
   const guest = await Guest.findByPk(id);
@@ -343,7 +328,6 @@ exports.deleteGuest = catchAsync(async (req, res, next) => {
     return next(new AppError('No guest found with that ID', 404));
   }
 
-  // Safety check for active bookings
   const activeBookings = await Booking.findOne({
     where: {
       guestId: id,

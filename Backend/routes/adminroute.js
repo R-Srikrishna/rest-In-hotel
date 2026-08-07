@@ -3,24 +3,19 @@ const adminController = require('../controllers/adminController');
 
 const router = express.Router();
 
-// =============================================================================
-// 🔓 PUBLIC ROUTES
-// =============================================================================
+// Public route for admin authentication
 router.post('/login', adminController.adminLogin);
 
-// =============================================================================
-// 🔒 PROTECTED ROUTES (Requires valid JWT Token)
-// =============================================================================
+// Protects all subsequent routes with JWT authentication middleware
 router.use(adminController.protectAdmin);
 
-// -----------------------------------------------------------------------------
-// 👑 SUPER-ADMIN ONLY ROUTES
-// -----------------------------------------------------------------------------
+// Super-admin routes for listing and creating admin accounts
 router
   .route('/manage-admins')
   .get(adminController.restrictTo('super-admin'), adminController.getAllAdmins)
   .post(adminController.restrictTo('super-admin'), adminController.createAdmin);
 
+// Super-admin routes for updating and deleting specific admin accounts
 router
   .route('/manage-admins/:id')
   .patch(adminController.restrictTo('super-admin'), adminController.updateAdmin)
@@ -29,10 +24,7 @@ router
     adminController.deleteAdmin,
   );
 
-// -----------------------------------------------------------------------------
-// 📊 DASHBOARD ROUTES (ACCESSIBLE BY BOTH ADMIN & SUPER-ADMIN)
-// -----------------------------------------------------------------------------
-// Guest Management
+// Guest management routes for retrieving and creating guest accounts
 router
   .route('/guests')
   .get(
@@ -44,6 +36,7 @@ router
     adminController.createGuests,
   );
 
+// Guest management routes for updating and deleting individual guest records
 router
   .route('/guests/:id')
   .patch(
@@ -55,7 +48,7 @@ router
     adminController.deleteGuest,
   );
 
-// Booking Management
+// Booking management routes for listing and creating bookings
 router
   .route('/bookings')
   .get(
@@ -67,7 +60,7 @@ router
     adminController.createBooking,
   );
 
-// Room Management
+// Room management route for retrieving rooms
 router
   .route('/rooms')
   .get(

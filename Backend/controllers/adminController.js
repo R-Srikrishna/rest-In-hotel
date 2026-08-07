@@ -9,18 +9,14 @@ const Room = require('../models/roomModel');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-// Generate JWT Token
+// Generates a JWT token using the admin ID and secret
 const signToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '90d',
   });
 };
 
-// Format & Send Response with Token
+// Formats user data, signs a token, and sends a JSON authentication response
 const createSendToken = (admin, statusCode, res) => {
   const token = signToken(admin.id);
 
@@ -36,11 +32,7 @@ const createSendToken = (admin, statusCode, res) => {
   });
 };
 
-// =============================================================================
-// 1. AUTHENTICATION & AUTHORIZATION MIDDLEWARE
-// =============================================================================
-
-// Admin & Super-Admin Login
+// Handles admin and super-admin login requests by validating credentials
 exports.adminLogin = catchAsync(async (req, res, next) => {
   const { email, password } = req.body;
 
@@ -62,7 +54,7 @@ exports.adminLogin = catchAsync(async (req, res, next) => {
   createSendToken(admin, 200, res);
 });
 
-// Protect Middleware (Verifies JWT and attaches req.admin)
+// Middleware to verify the JWT token and protect protected admin routes
 exports.protectAdmin = catchAsync(async (req, res, next) => {
   let token;
 
@@ -92,7 +84,7 @@ exports.protectAdmin = catchAsync(async (req, res, next) => {
   next();
 });
 
-// Role Restriction Middleware
+// Middleware to restrict access based on specified user roles
 exports.restrictTo = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.admin.role)) {
@@ -104,11 +96,7 @@ exports.restrictTo = (...roles) => {
   };
 };
 
-// =============================================================================
-// 2. ADMIN MANAGEMENT (SUPER-ADMIN ONLY)
-// =============================================================================
-
-// Get List of All Admins
+// Retrieves a list of all registered admin accounts excluding passwords
 exports.getAllAdmins = catchAsync(async (req, res, next) => {
   const admins = await Admin.findAll({
     attributes: { exclude: ['password'] },
@@ -121,12 +109,10 @@ exports.getAllAdmins = catchAsync(async (req, res, next) => {
   });
 });
 
-// Create New Admin
-// Create New Admin
+// Creates a new admin account with hashed password credentials
 exports.createAdmin = catchAsync(async (req, res, next) => {
   const { firstName, lastName, email, password, role } = req.body;
 
-  // Validate required fields
   if (!firstName || !lastName || !email || !password) {
     return next(
       new AppError(
@@ -164,11 +150,7 @@ exports.createAdmin = catchAsync(async (req, res, next) => {
   });
 });
 
-// =============================================================================
-// ADMIN MANAGEMENT (SUPER-ADMIN ONLY)
-// =============================================================================
-
-// Update Admin Details
+// Updates administrative details for an existing admin account
 exports.updateAdmin = catchAsync(async (req, res, next) => {
   const { id } = req.params;
   const { firstName, lastName, email, role, password } = req.body;
@@ -179,7 +161,6 @@ exports.updateAdmin = catchAsync(async (req, res, next) => {
     return next(new AppError('No admin found with that ID', 404));
   }
 
-  // Check if updating email and ensure it's not taken
   if (email && email !== adminToUpdate.email) {
     const existingAdmin = await Admin.findOne({ where: { email } });
     if (existingAdmin) {
@@ -187,13 +168,11 @@ exports.updateAdmin = catchAsync(async (req, res, next) => {
     }
   }
 
-  // Update properties if provided in body
   if (firstName !== undefined) adminToUpdate.firstName = firstName;
   if (lastName !== undefined) adminToUpdate.lastName = lastName;
   if (email !== undefined) adminToUpdate.email = email;
   if (role !== undefined) adminToUpdate.role = role;
 
-  // Password update triggers the model's beforeUpdate hook automatically
   if (password) adminToUpdate.password = password;
 
   await adminToUpdate.save();
@@ -209,7 +188,7 @@ exports.updateAdmin = catchAsync(async (req, res, next) => {
   });
 });
 
-// Delete Admin
+// Removes an admin account while preventing self-deletion
 exports.deleteAdmin = catchAsync(async (req, res, next) => {
   const adminToDelete = await Admin.findByPk(req.params.id);
 
@@ -217,7 +196,6 @@ exports.deleteAdmin = catchAsync(async (req, res, next) => {
     return next(new AppError('No admin found with that ID', 404));
   }
 
-  // Safeguard: Prevent super-admins from deleting their own account
   if (adminToDelete.id === req.admin.id) {
     return next(new AppError('You cannot delete your own account', 400));
   }
@@ -229,10 +207,8 @@ exports.deleteAdmin = catchAsync(async (req, res, next) => {
     data: null,
   });
 });
-// =============================================================================
-// 3. DASHBOARD: GUEST MANAGEMENT (Admin & Super-Admin)
-// =============================================================================
 
+// Retrieves a list of all guests excluding sensitive fields
 exports.getGuests = catchAsync(async (req, res, next) => {
   const guests = await Guest.findAll({
     attributes: { exclude: ['password', 'verificationToken'] },
@@ -245,6 +221,7 @@ exports.getGuests = catchAsync(async (req, res, next) => {
   });
 });
 
+// Creates a new guest record with hashed credentials
 exports.createGuests = catchAsync(async (req, res, next) => {
   const {
     firstName,
@@ -295,6 +272,7 @@ exports.createGuests = catchAsync(async (req, res, next) => {
   });
 });
 
+// Updates profile information for an existing guest account
 exports.updateGuest = catchAsync(async (req, res, next) => {
   const { id } = req.params;
   const { firstName, lastName, email, phoneNumber, gender, nationality } =
@@ -344,6 +322,7 @@ exports.updateGuest = catchAsync(async (req, res, next) => {
   });
 });
 
+// Deletes a guest profile after verifying there are no active bookings
 exports.deleteGuest = catchAsync(async (req, res, next) => {
   const { id } = req.params;
 
@@ -377,10 +356,7 @@ exports.deleteGuest = catchAsync(async (req, res, next) => {
   });
 });
 
-// =============================================================================
-// 4. DASHBOARD: BOOKING MANAGEMENT (Admin & Super-Admin)
-// =============================================================================
-
+// Fetches all booking records along with associated guest and room details
 exports.getBookings = catchAsync(async (req, res, next) => {
   const bookings = await Booking.findAll({
     include: [
@@ -396,6 +372,7 @@ exports.getBookings = catchAsync(async (req, res, next) => {
   });
 });
 
+// Creates a new room booking entry for a guest
 exports.createBooking = catchAsync(async (req, res, next) => {
   const { guestId, roomId, checkInDate, checkOutDate, totalPrice, status } =
     req.body;
@@ -421,10 +398,7 @@ exports.createBooking = catchAsync(async (req, res, next) => {
   });
 });
 
-// =============================================================================
-// 5. DASHBOARD: ROOM MANAGEMENT (Admin & Super-Admin)
-// =============================================================================
-
+// Fetches a list of all available rooms
 exports.getRooms = catchAsync(async (req, res, next) => {
   const rooms = await Room.findAll();
 

@@ -2,27 +2,22 @@ const { Op } = require('sequelize');
 const Booking = require('../models/bookingModel');
 const Room = require('../models/roomModel');
 const Guest = require('../models/guestModel');
+const { sequelize } = require('../models/bookingModel');
 
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 
-// =============================================================================
-// 🛠️ HELPER FUNCTIONS
-// =============================================================================
-
-/**
- * Checks if a room has overlapping active bookings for a given date range.
- * Overlap formula: (existingCheckIn < newCheckOut) AND (existingCheckOut > newCheckIn)
- */
+// Checks if a room has overlapping active bookings for a given date range
 const isRoomBooked = async (
   roomId,
   checkInDate,
   checkOutDate,
   excludeBookingId = null,
+  transaction = null,
 ) => {
   const whereClause = {
     roomId,
-    status: { [Op.notIn]: ['cancelled'] }, // Ignore cancelled bookings
+    status: { [Op.notIn]: ['cancelled'] },
     checkInDate: { [Op.lt]: checkOutDate },
     checkOutDate: { [Op.gt]: checkInDate },
   };
@@ -31,15 +26,28 @@ const isRoomBooked = async (
     whereClause.id = { [Op.ne]: excludeBookingId };
   }
 
-  const existingBooking = await Booking.findOne({ where: whereClause });
+  const existingBooking = await Booking.findOne({
+    where: whereClause,
+    transaction,
+  });
+
   return !!existingBooking;
 };
 
-// =============================================================================
-// 🟢 CLIENT (GUEST) SIDE ACTIONS
-// =============================================================================
+// Calculates the total number of nights between check-in and check-out dates
+const calculateNights = (checkInStr, checkOutStr) => {
+  const checkIn = new Date(checkInStr);
+  const checkOut = new Date(checkOutStr);
 
-// 1. Client views all available rooms for selected dates
+  if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
+    return 0;
+  }
+
+  const diffTime = checkOut.getTime() - checkIn.getTime();
+  return Math.round(diffTime / (1000 * 60 * 60 * 24));
+};
+
+// Retrieves all available rooms for a given date range that are not already booked
 exports.getAvailableRooms = catchAsync(async (req, res, next) => {
   const { checkInDate, checkOutDate } = req.query;
 
@@ -49,7 +57,13 @@ exports.getAvailableRooms = catchAsync(async (req, res, next) => {
     );
   }
 
-  // Find all rooms booked within the selected date range
+  const nights = calculateNights(checkInDate, checkOutDate);
+  if (nights <= 0) {
+    return next(
+      new AppError('Check-out date must be after check-in date.', 400),
+    );
+  }
+
   const bookedRooms = await Booking.findAll({
     attributes: ['roomId'],
     where: {
@@ -61,7 +75,6 @@ exports.getAvailableRooms = catchAsync(async (req, res, next) => {
 
   const bookedRoomIds = bookedRooms.map((b) => b.roomId);
 
-  // Fetch active rooms that are NOT in the booked room IDs list
   const availableRooms = await Room.findAll({
     where: {
       available: true,
@@ -78,71 +91,84 @@ exports.getAvailableRooms = catchAsync(async (req, res, next) => {
   });
 });
 
-// 2. Client creates a booking for an available room
+// Handles creation of a new room booking by a authenticated guest inside a transaction
 exports.createBooking = catchAsync(async (req, res, next) => {
-  const { roomId, checkInDate, checkOutDate, totalPrice, selectedFeatures } =
-    req.body;
-  const guestId = req.user.id; // Tied directly to logged-in guest context
+  const { roomId, checkInDate, checkOutDate, selectedFeatures } = req.body;
+  const guestId = req.user.id;
 
-  if (!roomId || !checkInDate || !checkOutDate || !totalPrice) {
-    return next(
-      new AppError('Please provide room, dates, and total price.', 400),
-    );
-  }
-
-  // Check if room exists
-  const room = await Room.findByPk(roomId);
-  if (!room) {
-    return next(new AppError('No room found with that ID', 404));
-  }
-
-  // Check if room is active/available
-  if (room.available === false) {
-    return next(new AppError('This room is currently out of service', 400));
-  }
-
-  // Check date collision/overlap
-  const booked = await isRoomBooked(roomId, checkInDate, checkOutDate);
-  if (booked) {
+  if (!roomId || !checkInDate || !checkOutDate) {
     return next(
       new AppError(
-        'This room is already reserved for the selected dates.',
+        'Please provide room ID, check-in, and check-out dates.',
         400,
       ),
     );
   }
 
-  // 💡 Resolve nightlyRate directly from req.body OR from room.price
-  const nightlyRate = req.body.nightlyRate || room.price;
-
-  if (!nightlyRate) {
+  const nights = calculateNights(checkInDate, checkOutDate);
+  if (nights <= 0) {
     return next(
-      new AppError('Nightly rate could not be determined for this room.', 400),
+      new AppError(
+        'Check-out date must be at least 1 day after check-in date.',
+        400,
+      ),
     );
   }
 
-  // Create booking
-  const newBooking = await Booking.create({
-    guestId,
-    guestName: req.body.guestName,
-    roomId,
-    checkInDate,
-    checkOutDate,
-    nightlyRate, // 👈 Added required field
-    totalPrice,
-    selectedFeatures: selectedFeatures || null,
-    status: 'booked', // 👈 Updated to match Model ENUM ('booked')
+  const result = await sequelize.transaction(async (t) => {
+    const room = await Room.findByPk(roomId, { transaction: t });
+    if (!room) {
+      throw new AppError('No room found with that ID.', 404);
+    }
+
+    if (!room.available) {
+      throw new AppError('This room is currently out of service.', 400);
+    }
+
+    const booked = await isRoomBooked(
+      roomId,
+      checkInDate,
+      checkOutDate,
+      null,
+      t,
+    );
+    if (booked) {
+      throw new AppError(
+        'This room is already reserved for the selected dates.',
+        400,
+      );
+    }
+
+    const nightlyRate = Number(room.price);
+    const totalPrice = nights * nightlyRate;
+
+    const newBooking = await Booking.create(
+      {
+        guestId,
+        guestName: req.user.name || req.body.guestName,
+        roomId,
+        checkInDate,
+        checkOutDate,
+        nightlyRate,
+        totalPrice,
+        selectedFeatures: selectedFeatures || null,
+        status: 'booked',
+      },
+      { transaction: t },
+    );
+
+    return newBooking;
   });
 
   res.status(201).json({
     status: 'success',
     data: {
-      booking: newBooking,
+      booking: result,
     },
   });
 });
 
-// 3. Client views all their own bookings history
+// Retrieves all booking records belonging to the logged-in guest
 exports.getMyBookings = catchAsync(async (req, res, next) => {
   const bookings = await Booking.findAll({
     where: { guestId: req.user.id },
@@ -164,7 +190,7 @@ exports.getMyBookings = catchAsync(async (req, res, next) => {
   });
 });
 
-// 4. Client views a single booking detail
+// Retrieves a specific booking by ID belonging to the logged-in guest
 exports.getMyBookingById = catchAsync(async (req, res, next) => {
   const booking = await Booking.findOne({
     where: { id: req.params.id, guestId: req.user.id },
@@ -178,7 +204,7 @@ exports.getMyBookingById = catchAsync(async (req, res, next) => {
 
   if (!booking) {
     return next(
-      new AppError('No booking found with that ID under your account', 404),
+      new AppError('No booking found with that ID under your account.', 404),
     );
   }
 
@@ -190,11 +216,7 @@ exports.getMyBookingById = catchAsync(async (req, res, next) => {
   });
 });
 
-// =============================================================================
-// 🔴 ADMIN SIDE ACTIONS (BOOKINGS DASHBOARD)
-// =============================================================================
-
-// 1. Admin Dashboard: Get total/all bookings in the system
+// Fetches all booking records with guest and room details for admin management
 exports.getAllBookings = catchAsync(async (req, res, next) => {
   const bookings = await Booking.findAll({
     include: [
@@ -219,7 +241,7 @@ exports.getAllBookings = catchAsync(async (req, res, next) => {
   });
 });
 
-// 2. Admin Dashboard: Get single booking details
+// Fetches a single booking record by ID with associated guest and room details
 exports.getBookingById = catchAsync(async (req, res, next) => {
   const booking = await Booking.findByPk(req.params.id, {
     include: [
@@ -235,7 +257,7 @@ exports.getBookingById = catchAsync(async (req, res, next) => {
   });
 
   if (!booking) {
-    return next(new AppError('No booking found with that ID', 404));
+    return next(new AppError('No booking found with that ID.', 404));
   }
 
   res.status(200).json({
@@ -246,122 +268,140 @@ exports.getBookingById = catchAsync(async (req, res, next) => {
   });
 });
 
-// 3. Admin Dashboard: Add booking manually for any guest
+// Allows admins to create a booking on behalf of a guest inside a transaction
 exports.createAdminBooking = catchAsync(async (req, res, next) => {
   const {
     guestId,
     roomId,
     checkInDate,
     checkOutDate,
-    totalPrice,
     status,
     selectedFeatures,
   } = req.body;
 
-  if (!guestId || !roomId || !checkInDate || !checkOutDate || !totalPrice) {
+  if (!guestId || !roomId || !checkInDate || !checkOutDate) {
     return next(
       new AppError(
-        'Please provide guestId, roomId, dates, and total price.',
+        'Please provide guestId, roomId, and valid date range.',
         400,
       ),
     );
   }
 
-  // Ensure guest exists
-  const guest = await Guest.findByPk(guestId);
-  if (!guest) {
-    return next(new AppError('No guest found with that ID', 404));
-  }
-
-  // Ensure room exists
-  const room = await Room.findByPk(roomId);
-  if (!room) {
-    return next(new AppError('No room found with that ID', 404));
-  }
-
-  // Check date collision/overlap
-  const booked = await isRoomBooked(roomId, checkInDate, checkOutDate);
-  if (booked) {
+  const nights = calculateNights(checkInDate, checkOutDate);
+  if (nights <= 0) {
     return next(
-      new AppError(
+      new AppError('Check-out date must be after check-in date.', 400),
+    );
+  }
+
+  const result = await sequelize.transaction(async (t) => {
+    const guest = await Guest.findByPk(guestId, { transaction: t });
+    if (!guest) {
+      throw new AppError('No guest found with that ID.', 404);
+    }
+
+    const room = await Room.findByPk(roomId, { transaction: t });
+    if (!room) {
+      throw new AppError('No room found with that ID.', 404);
+    }
+
+    const booked = await isRoomBooked(
+      roomId,
+      checkInDate,
+      checkOutDate,
+      null,
+      t,
+    );
+    if (booked) {
+      throw new AppError(
         'This room is already reserved for the selected dates.',
         400,
-      ),
+      );
+    }
+
+    const nightlyRate = req.body.nightlyRate || Number(room.price);
+    const totalPrice = req.body.totalPrice || nights * nightlyRate;
+
+    const newBooking = await Booking.create(
+      {
+        guestId,
+        roomId,
+        checkInDate,
+        checkOutDate,
+        nightlyRate,
+        totalPrice,
+        selectedFeatures: selectedFeatures || null,
+        status: status || 'booked',
+      },
+      { transaction: t },
     );
-  }
 
-  // 💡 Resolve nightlyRate directly from req.body OR from room.price
-  const nightlyRate = req.body.nightlyRate || room.price;
-
-  if (!nightlyRate) {
-    return next(
-      new AppError('Nightly rate could not be determined for this room.', 400),
-    );
-  }
-
-  // Create booking
-  const newBooking = await Booking.create({
-    guestId,
-    roomId,
-    checkInDate,
-    checkOutDate,
-    nightlyRate, // 👈 Added required field
-    totalPrice,
-    selectedFeatures: selectedFeatures || null,
-    status: status || 'booked', // 👈 Updated to match Model ENUM
+    return newBooking;
   });
 
   res.status(201).json({
     status: 'success',
     data: {
-      booking: newBooking,
+      booking: result,
     },
   });
 });
 
-// 4. Admin Dashboard: Update booking (status, dates, room assignment)
+// Updates details of an existing booking while ensuring schedule availability
 exports.updateBooking = catchAsync(async (req, res, next) => {
-  const booking = await Booking.findByPk(req.params.id);
+  const result = await sequelize.transaction(async (t) => {
+    const booking = await Booking.findByPk(req.params.id, { transaction: t });
 
-  if (!booking) {
-    return next(new AppError('No booking found with that ID', 404));
-  }
-
-  const roomId = req.body.roomId || booking.roomId;
-  const checkInDate = req.body.checkInDate || booking.checkInDate;
-  const checkOutDate = req.body.checkOutDate || booking.checkOutDate;
-
-  // Re-verify room availability if dates or rooms are updated
-  if (req.body.roomId || req.body.checkInDate || req.body.checkOutDate) {
-    const booked = await isRoomBooked(
-      roomId,
-      checkInDate,
-      checkOutDate,
-      booking.id,
-    );
-    if (booked) {
-      return next(
-        new AppError('This room is already reserved for these dates.', 400),
-      );
+    if (!booking) {
+      throw new AppError('No booking found with that ID.', 404);
     }
-  }
 
-  await booking.update(req.body);
+    const roomId = req.body.roomId || booking.roomId;
+    const checkInDate = req.body.checkInDate || booking.checkInDate;
+    const checkOutDate = req.body.checkOutDate || booking.checkOutDate;
+
+    if (req.body.checkInDate || req.body.checkOutDate) {
+      const nights = calculateNights(checkInDate, checkOutDate);
+      if (nights <= 0) {
+        throw new AppError('Check-out date must be after check-in date.', 400);
+      }
+    }
+
+    if (req.body.roomId || req.body.checkInDate || req.body.checkOutDate) {
+      const booked = await isRoomBooked(
+        roomId,
+        checkInDate,
+        checkOutDate,
+        booking.id,
+        t,
+      );
+      if (booked) {
+        throw new AppError(
+          'This room is already reserved for these dates.',
+          400,
+        );
+      }
+    }
+
+    await booking.update(req.body, { transaction: t });
+    return booking;
+  });
 
   res.status(200).json({
     status: 'success',
     data: {
-      booking,
+      booking: result,
     },
   });
 });
 
-// 5. Admin Dashboard: Delete booking from system
+// Deletes a booking record by ID
 exports.deleteBooking = catchAsync(async (req, res, next) => {
   const booking = await Booking.findByPk(req.params.id);
 
   if (!booking) {
-    return next(new AppError('No booking found with that ID', 404));
+    return next(new AppError('No booking found with that ID.', 404));
   }
 
   await booking.destroy();

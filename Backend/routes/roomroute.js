@@ -4,31 +4,28 @@ const adminController = require('../controllers/adminController');
 
 const router = express.Router();
 
-// =============================================================================
-// 🟢 PUBLIC & GUEST ROUTES
-// =============================================================================
+// Public route to view all rooms in the catalog
+router.get('/', roomsController.getAllRooms);
 
-// Public catalog: View available rooms for booking
-router.get('/available', roomsController.getAvailableRooms);
+// Public route to filter available rooms
+if (roomsController.getAvailableRooms) {
+  router.get('/available', roomsController.getAvailableRooms);
+}
 
-// Public/Guest: View detailed specs for a specific room
+// Public route to view detailed specifications for a specific room by ID
 router.get('/:id', roomsController.getRoomById);
 
-// =============================================================================
-// 🔴 ADMIN & SUPER-ADMIN ROUTES
-// =============================================================================
-
-// Protect all management endpoints below
+// Protects all subsequent room management endpoints for administrative access only
 router.use(adminController.protectAdmin);
 router.use(adminController.restrictTo('admin', 'super-admin'));
 
-// Admin: View all rooms (including maintenance/unavailable) OR add a new room
-router
-  .route('/')
-  .get(roomsController.getRooms)
-  .post(roomsController.createRoom);
+// Admin route to create a new room
+router.post('/', roomsController.createRoom);
 
-// Admin: Update room pricing/status OR remove a room from inventory
+// Admin route to toggle room availability or out-of-service status
+router.patch('/:id/availability', roomsController.toggleRoomAvailability);
+
+// Admin routes to update or delete a room by ID
 router
   .route('/:id')
   .patch(roomsController.updateRoom)

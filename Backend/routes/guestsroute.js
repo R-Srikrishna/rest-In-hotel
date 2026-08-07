@@ -4,35 +4,28 @@ const adminController = require('../controllers/adminController');
 
 const router = express.Router();
 
-// =============================================================================
-// 🟢 PUBLIC GUEST ROUTES
-// =============================================================================
+// Public routes for guest signup and login
 router.post('/signup', guestsController.guestSignup);
 router.post('/login', guestsController.guestLogin);
 
-// =============================================================================
-// 🟢 PROTECTED GUEST ROUTES (Logged-in Guests)
-// =============================================================================
+// Protects all personal profile routes with guest authentication middleware
 router.use('/me', guestsController.protectGuest);
 
-// Profile Management for current guest
+// Profile management routes for the currently authenticated guest
 router.get('/me', guestsController.getMe);
 router.patch('/me/update', guestsController.updateMe);
 
-// =============================================================================
-// 🔴 ADMIN & SUPER-ADMIN ROUTES
-// =============================================================================
-// Restrict all guest management routes below to logged-in Admins & Super-Admins
+// Protects all subsequent routes for administrative access only
 router.use(adminController.protectAdmin);
 router.use(adminController.restrictTo('admin', 'super-admin'));
 
-// Fetch all guests or manually create a new guest
+// Admin routes for retrieving all guest profiles or creating a guest record
 router
   .route('/')
   .get(guestsController.getAllGuests)
   .post(guestsController.createGuest);
 
-// Fetch, update, or delete a specific guest by ID
+// Admin routes for fetching, updating, or deleting a specific guest by ID
 router
   .route('/:id')
   .get(guestsController.getGuestById)

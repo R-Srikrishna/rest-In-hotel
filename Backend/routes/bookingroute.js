@@ -5,43 +5,41 @@ const adminController = require('../controllers/adminController');
 
 const router = express.Router();
 
-// =============================================================================
-// 🟢 CLIENT (GUEST) SIDE ROUTES
-// =============================================================================
-
-// Public: Get available rooms for dates
+// Public route to check available rooms for specified dates
 router.get('/available-rooms', bookingsController.getAvailableRooms);
 
-// Guest actions (Requires guest auth)
+// Authenticated guest route to create a new booking
 router.post(
   '/my-booking',
   guestsController.protectGuest,
   bookingsController.createBooking,
 );
+
+// Authenticated guest route to retrieve all personal bookings
 router.get(
   '/my-bookings',
   guestsController.protectGuest,
   bookingsController.getMyBookings,
 );
+
+// Authenticated guest route to retrieve a specific personal booking by ID
 router.get(
   '/my-bookings/:id',
   guestsController.protectGuest,
   bookingsController.getMyBookingById,
 );
 
-// =============================================================================
-// 🔴 ADMIN DASHBOARD ROUTES
-// =============================================================================
+// Protects subsequent routes for administrative access only
 router.use(adminController.protectAdmin);
 router.use(adminController.restrictTo('admin', 'super-admin'));
 
-// Admin Dashboard: View total bookings or Add new booking
+// Admin routes for fetching all bookings or creating a booking as an admin
 router
   .route('/')
   .get(bookingsController.getAllBookings)
   .post(bookingsController.createAdminBooking);
 
-// Admin Dashboard: View single booking, Update booking, or Delete booking
+// Admin routes for getting, updating, or deleting a specific booking by ID
 router
   .route('/:id')
   .get(bookingsController.getBookingById)
