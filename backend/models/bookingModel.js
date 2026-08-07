@@ -27,7 +27,7 @@ const Booking = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'Rooms',
+        model: 'rooms',
         key: 'id',
       },
     },
@@ -35,7 +35,7 @@ const Booking = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'Guests',
+        model: 'guests',
         key: 'id',
       },
     },
