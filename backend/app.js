@@ -13,9 +13,10 @@ const app = express();
 
 const allowedOrigins = [
   process.env.FRONTEND_URL,
+  'https://rest-in-hotel-ten.vercel.app',
+  'https://rest-in-hotel-gmo34s1i9-sri-rayudus-projects.vercel.app',
   'http://localhost:3000',
   'http://localhost:3001',
-  'https://rest-in-hotel-ten.vercel.app',
 ].filter(Boolean);
 
 app.use(
