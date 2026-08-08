@@ -23,7 +23,7 @@ const seedDefaultUsers = async () => {
         role: 'super-admin',
       });
 
-      console.log('✅ Default Super Admin created');
+      console.log('Default Super Admin created');
     }
 
     // Create default Guest
@@ -40,7 +40,7 @@ const seedDefaultUsers = async () => {
         phoneNumber: '1234567890',
       });
 
-      console.log('✅ Default Guest created');
+      console.log('Default Guest created');
     }
   } catch (error) {
     console.error('Error while seeding default users:', error);
@@ -51,15 +51,15 @@ const startServer = async () => {
   try {
     await sequelize.sync();
 
-    console.log('✅ Database connected and synchronized');
+    console.log('Database connected and synchronized');
 
     await seedDefaultUsers();
 
     app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Server is running on port ${PORT}`);
+      console.log(`Server is running on port ${PORT}`);
     });
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    console.error(' Failed to start server:', error);
     process.exit(1);
   }
 };
