@@ -104,25 +104,19 @@ export default function AuthForm({
       <div className="mx-auto w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl shadow-black/40">
         <div className="px-6 py-8 sm:px-10 lg:px-12">
           <div className="mb-6 text-center">
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-100">
-              {isSignupMode
-                ? "Guest access"
-                : isAdminPortal
-                  ? "Admin Portal"
-                  : "Guest access"}
-            </p>
-            <h1 className="mt-4 text-4xl font-semibold leading-tight sm:text-5xl">
+            {/* <h1 className="mt-4 text-4xl font-semibold leading-tight sm:text-5xl">
               {isSignupMode
                 ? "Create your account"
                 : isAdminPortal
                   ? "Sign in to admin"
                   : "Welcome back"}
-            </h1>
+            </h1> */}
             {/* <p className="mt-4 text-base text-blue-50/90">
               {isSignupMode
                 ? "New guests can create an account here."
                 : "Sign in as an admin or guest using the same form."}
             </p> */}
+            <h1 className="text-2xl font-bold">Rest-Inn</h1>
           </div>
 
           <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
