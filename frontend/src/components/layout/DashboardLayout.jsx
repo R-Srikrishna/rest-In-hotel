@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import Header from "./Header";
 import Footer from "./Footer";
 import Sidebar from "./Sidebar";
+
 // Define the routes that only admins should access
 const ADMIN_ONLY_ROUTES = [
   "/admin",
@@ -64,6 +65,10 @@ export default function ProtectedLayout({ children }) {
   if (isAuthenticated && isAdminRoute && user?.role !== "admin") {
     return null;
   }
+
+  // if(authenticated){
+
+  // }
 
   if (isAuthenticated) {
     return (
